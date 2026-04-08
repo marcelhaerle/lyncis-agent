@@ -47,6 +47,80 @@ To run the agent locally against your development backend:
 
 The agent will attempt to register itself with the backend, save its local token (development mode uses the current directory instead of `/etc/lyncis/config.json`), and start polling for new tasks.
 
+## Deployment Setup
+
+### Download using GitHub Releases
+
+The recommended way to deploy the `lyncis-agent` to target systems is by downloading the statically compiled binaries from the [GitHub Releases](https://github.com/marcelhaerle/lyncis-agent/releases) page. We provide binaries for Linux (`amd64` and `arm64`).
+
+1: Download the latest binary for your architecture:
+
+```bash
+# Example for Linux AMD64
+wget https://github.com/marcelhaerle/lyncis-agent/releases/latest/download/lyncis-agent-linux-amd64
+chmod +x lyncis-agent-linux-amd64
+sudo mv lyncis-agent-linux-amd64 /usr/local/bin/lyncis-agent
+```
+
+2: Ensure [Lynis](https://cisofy.com/download/lynis/) is installed on the target machine as the agent relies on it to perform security audits.
+
+### Configuration
+
+The agent requires configuration to know where the central backend is located. By default, it looks for its configuration file at `/etc/lyncis/config.json`.
+
+1: Create the configuration directory:
+
+```bash
+sudo mkdir -p /etc/lyncis
+```
+
+2: Create the `config.json` file inside with the backend URL:
+
+```json
+{
+  "api_endpoint": "https://your-lyncis-backend-url.com"
+}
+```
+
+### Running as a Systemd Service
+
+To keep the agent running continuously and start it on boot, set it up as a systemd service:
+
+1: Create a service file at `/etc/systemd/system/lyncis-agent.service`:
+
+```ini
+[Unit]
+Description=Lyncis Security Agent
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/lyncis-agent
+Restart=always
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=lyncis-agent
+
+[Install]
+WantedBy=multi-user.target
+```
+
+2: Enable and start the service:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable lyncis-agent
+sudo systemctl start lyncis-agent
+```
+
+3: Check the status and logs:
+
+```bash
+sudo systemctl status lyncis-agent
+sudo journalctl -u lyncis-agent -f
+```
+
 ## Related Repositories
 
 - [lyncis-backend](https://github.com/marcelhaerle/lyncis-backend) — Go API backend
