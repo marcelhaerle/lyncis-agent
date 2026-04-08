@@ -34,8 +34,6 @@ go mod download
 go build -o lyncis-agent main.go
 ```
 
-*(Note: `main.go` and `go.mod` will be created as part of the initial implementation steps.)*
-
 ### Running Locally
 
 To run the agent locally against your development backend:
