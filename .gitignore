@@ -1,0 +1,23 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+lyncis-agent
+
+# Environment variables
+.env
+
+# Local configuration/state
+config.json
+
+# Vendor directory
+/vendor/
+
+# IDEs and OS files
+.idea/
+.vscode/
+.DS_Store
