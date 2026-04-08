@@ -28,6 +28,18 @@ type TaskResponse struct {
 	Task *Task `json:"task"`
 }
 
+type ScanFinding struct {
+	Severity    string `json:"severity"`
+	TestID      string `json:"test_id"`
+	Description string `json:"description"`
+}
+
+type ScanPayload struct {
+	HardeningIndex int                    `json:"hardening_index"`
+	RawData        map[string]interface{} `json:"raw_data"`
+	Findings       []ScanFinding          `json:"findings"`
+}
+
 type CompleteTaskRequest struct {
 	Status string  `json:"status"`
 	Error  *string `json:"error"`
@@ -100,11 +112,11 @@ func (c *Client) PollPendingTask(token string) (*Task, error) {
 	return taskResp.Task, nil
 }
 
-func (c *Client) CompleteTask(token, taskID string) error {
+func (c *Client) CompleteTask(token, taskID, status string, errorMsg *string) error {
 	completeURL := fmt.Sprintf("%s/api/v1/agent/tasks/%s/complete", c.BackendURL, taskID)
 	reqBody := CompleteTaskRequest{
-		Status: "completed",
-		Error:  nil,
+		Status: status,
+		Error:  errorMsg,
 	}
 
 	jsonData, err := json.Marshal(reqBody)
@@ -127,6 +139,34 @@ func (c *Client) CompleteTask(token, taskID string) error {
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("failed to complete task, status: %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+func (c *Client) SendScan(token string, payload ScanPayload) error {
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal scan payload: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/api/v1/agent/scans", c.BackendURL)
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		bodyInfo, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to send scan, status: %d, response: %s", resp.StatusCode, string(bodyInfo))
 	}
 
 	return nil

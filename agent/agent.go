@@ -46,15 +46,42 @@ func (a *Agent) pollOnce() {
 
 	fmt.Printf("Received task: %s (ID: %s)\n", task.Command, task.ID)
 
-	// Mock execution
-	fmt.Printf("Executing mock task: %s...\n", task.Command)
-	time.Sleep(1 * time.Second)
-	fmt.Println("Mock task completed.")
+	var status string
+	var errStr *string
 
-	// Mark task completed
-	if err := a.Client.CompleteTask(a.Config.Token, task.ID); err != nil {
+	if task.Command == "run_lynis" {
+		fmt.Printf("Executing task: %s...\n", task.Command)
+
+		payload, runErr := RunLynis()
+
+		if runErr != nil {
+			log.Printf("Error executing Lynis: %v", runErr)
+			status = "failed"
+			eMsg := runErr.Error()
+			errStr = &eMsg
+		} else {
+			// Send to backend
+			if sendErr := a.Client.SendScan(a.Config.Token, payload); sendErr != nil {
+				log.Printf("Error sending scan payload: %v", sendErr)
+				status = "failed"
+				eMsg := sendErr.Error()
+				errStr = &eMsg
+			} else {
+				fmt.Println("Scan payload sent successfully.")
+				status = "completed"
+			}
+		}
+	} else {
+		log.Printf("Unknown task command: %s", task.Command)
+		status = "failed"
+		eMsg := "unknown command: " + task.Command
+		errStr = &eMsg
+	}
+
+	// Mark task completed/failed
+	if err := a.Client.CompleteTask(a.Config.Token, task.ID, status, errStr); err != nil {
 		log.Printf("Error completing task: %v", err)
 	} else {
-		fmt.Printf("Task %s successfully marked as completed.\n", task.ID)
+		fmt.Printf("Task %s successfully marked as %s.\n", task.ID, status)
 	}
 }
