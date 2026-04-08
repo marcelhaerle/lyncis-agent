@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -26,6 +27,126 @@ type RegisterResponse struct {
 type Config struct {
 	AgentID string `json:"agent_id"`
 	Token   string `json:"token"`
+}
+
+type Task struct {
+	ID      string `json:"id"`
+	Command string `json:"command"`
+}
+
+type TaskResponse struct {
+	Task *Task `json:"task"`
+}
+
+type CompleteTaskRequest struct {
+	Status string  `json:"status"`
+	Error  *string `json:"error"`
+}
+
+func loadConfig(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var config Config
+	if err := json.Unmarshal(data, &config); err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+
+func startPolling(backendURL string, config *Config) {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	fmt.Println("Started task polling (Heartbeat) every 10 seconds...")
+
+	for range ticker.C {
+		pollTasks(backendURL, config, client)
+	}
+}
+
+func pollTasks(backendURL string, config *Config, client *http.Client) {
+	reqURL := fmt.Sprintf("%s/api/v1/agent/tasks/pending", backendURL)
+	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
+	if err != nil {
+		log.Printf("Error creating request: %v", err)
+		return
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", config.Token))
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("Error polling tasks: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNoContent {
+		// Nothing pending
+		return
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("Failed to poll tasks, Status: %d", resp.StatusCode)
+		return
+	}
+
+	var taskResp TaskResponse
+	if err := json.NewDecoder(resp.Body).Decode(&taskResp); err != nil {
+		log.Printf("Error decoding task response: %v", err)
+		return
+	}
+
+	if taskResp.Task == nil {
+		return
+	}
+
+	fmt.Printf("Received task: %s (ID: %s)\n", taskResp.Task.Command, taskResp.Task.ID)
+
+	// Mock execution
+	fmt.Printf("Executing mock task: %s...\n", taskResp.Task.Command)
+	time.Sleep(1 * time.Second)
+	fmt.Println("Mock task completed.")
+
+	// Mark task completed
+	completeTask(backendURL, config, client, taskResp.Task.ID)
+}
+
+func completeTask(backendURL string, config *Config, client *http.Client, taskID string) {
+	completeURL := fmt.Sprintf("%s/api/v1/agent/tasks/%s/complete", backendURL, taskID)
+	reqBody := CompleteTaskRequest{
+		Status: "completed",
+		Error:  nil,
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		log.Printf("Failed to marshal complete request: %v", err)
+		return
+	}
+
+	req, err := http.NewRequest(http.MethodPost, completeURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		log.Printf("Error creating complete request: %v", err)
+		return
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", config.Token))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("Error completing task: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		log.Printf("Failed to complete task, Status: %d", resp.StatusCode)
+	} else {
+		fmt.Printf("Task %s successfully marked as completed.\n", taskID)
+	}
 }
 
 func main() {
@@ -58,7 +179,12 @@ func main() {
 	// Check if already registered
 	if _, err := os.Stat(configPath); err == nil {
 		fmt.Println("Agent already registered. Configuration found at:", configPath)
-		// We would load config and start polling (Feature 3) here
+		config, err := loadConfig(configPath)
+		if err != nil {
+			log.Fatalf("Failed to load configuration: %v", err)
+		}
+		// Start polling (Feature 3) here
+		startPolling(backendURL, config)
 		return
 	}
 
@@ -108,4 +234,7 @@ func main() {
 	}
 
 	fmt.Printf("Configuration saved to %s\n", configPath)
+
+	// Start polling (Feature 3) after fresh registration
+	startPolling(backendURL, &config)
 }
