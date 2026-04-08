@@ -68,18 +68,10 @@ sudo mv lyncis-agent-linux-amd64 /usr/local/bin/lyncis-agent
 
 The agent requires configuration to know where the central backend is located. By default, it looks for its configuration file at `/etc/lyncis/config.json`.
 
-1: Create the configuration directory:
+Create the configuration directory:
 
 ```bash
 sudo mkdir -p /etc/lyncis
-```
-
-2: Create the `config.json` file inside with the backend URL:
-
-```json
-{
-  "api_endpoint": "https://your-lyncis-backend-url.com"
-}
 ```
 
 ### Running as a Systemd Service
@@ -101,6 +93,8 @@ RestartSec=10
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=lyncis-agent
+Environment=LYNCIS_BACKEND_URL=<YOUR_BACKEND_URL>
+Environment=LYNCIS_CONFIG_PATH=/etc/lyncis/config.json
 
 [Install]
 WantedBy=multi-user.target
