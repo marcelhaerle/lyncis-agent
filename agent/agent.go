@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"fmt"
 	"log"
 	"time"
 
