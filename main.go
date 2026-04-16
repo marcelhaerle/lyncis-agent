@@ -23,12 +23,13 @@ func main() {
 
 	backendURL := os.Getenv("LYNCIS_BACKEND_URL")
 	if backendURL == "" {
-		log.Fatalf("LYNCIS_BACKEND_URL environment variable is missing")
+		log.Fatal("LYNCIS_BACKEND_URL environment variable is missing")
 	}
 
 	configPath := os.Getenv("LYNCIS_CONFIG_PATH")
 	if configPath == "" {
-		log.Fatalf("LYNCIS_CONFIG_PATH environment variable is missing")
+		configPath = "/etc/lyncis/config.json"
+		fmt.Printf("LYNCIS_CONFIG_PATH is missing, defaulting to %s\n", configPath)
 	}
 
 	client := api.NewClient(backendURL)
