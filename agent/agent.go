@@ -9,8 +9,9 @@ import (
 )
 
 type Agent struct {
-	Config *config.Config
-	Client *api.Client
+	Config           *config.Config
+	Client           *api.Client
+	consecutiveErrs int
 }
 
 func NewAgent(cfg *config.Config, client *api.Client) *Agent {
@@ -34,15 +35,15 @@ func (a *Agent) StartPolling() {
 func (a *Agent) pollOnce() {
 	task, err := a.Client.PollPendingTask(a.Config.Token)
 	if err != nil {
-		// Log errors sparingly to avoid flooding logs with heartbeat failures
-		log.Printf("Error polling tasks")
+		a.consecutiveErrs++
+		// Log only on the first failure or every 6th failure (approx once per minute)
+		if a.consecutiveErrs == 1 || a.consecutiveErrs%6 == 0 {
+			log.Printf("Error polling tasks (consecutive failures: %d)", a.consecutiveErrs)
+		}
 		return
 	}
 
-	if task == nil {
-		// Nothing pending
-		return
-	}
+	a.consecutiveErrs = 0
 
 	log.Printf("Received task: %s (ID: %s)", task.Command, task.ID)
 
