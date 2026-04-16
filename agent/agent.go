@@ -45,6 +45,11 @@ func (a *Agent) pollOnce() {
 
 	a.consecutiveErrs = 0
 
+	if task == nil {
+		// Nothing pending
+		return
+	}
+
 	log.Printf("Received task: %s (ID: %s)", task.Command, task.ID)
 
 	var status string
