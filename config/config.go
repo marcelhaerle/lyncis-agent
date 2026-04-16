@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 )
 
 type Config struct {
@@ -23,6 +24,11 @@ func LoadConfig(path string) (*Config, error) {
 }
 
 func SaveConfig(path string, config *Config) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
 	configData, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
 		return err
